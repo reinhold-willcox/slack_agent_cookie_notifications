@@ -1,0 +1,37 @@
+{
+  "daniel": {
+    "full_name": "Daniel Pauli",
+    "slack_id": "U07PZ8YUCA3",
+    "notes": "Owns the cookie/cake column. Fallback when next week is blank."
+  },
+  "kunal": {
+    "full_name": "Kunal Deshmukh",
+    "slack_id": null,
+    "notes": "Slack user id not confirmed from #group-meeting history."
+  },
+  "jasmine": {
+    "full_name": "Jasmine Vrancken",
+    "slack_id": "U07H72Y5TR9",
+    "notes": "Confirmed from Slack canvas attribution and schedule posts."
+  },
+  "ema": {
+    "full_name": "Ema Šipková",
+    "slack_id": null,
+    "notes": "Distinct from Emma. Slack user id not confirmed from #group-meeting history."
+  },
+  "reinhold": {
+    "full_name": "Reinhold Willcox",
+    "slack_id": "U05Q1ED5NAU",
+    "notes": "Confirmed as the user who requested this reminder."
+  },
+  "bethany": {
+    "full_name": "Bethany Ludwig",
+    "slack_id": "U0896RW0J1L",
+    "notes": "Confirmed from Slack canvas attribution."
+  },
+  "hugues": {
+    "full_name": "Hugues Sana",
+    "slack_id": "UV7D9218B",
+    "notes": "High confidence from group-lead posts in #group-meeting; confirm if a DM ever looks wrong."
+  }
+}
