@@ -34,13 +34,14 @@ SKIP_TOKENS = {
 }
 
 COOKIE_REMINDER = (
-    "Hi {first}, this is a reminder that you are on cookie duty for next "
+    "Hi {mention}, this is a reminder that you are on cookie duty for next "
     "week's group meeting on {meeting_date}. Thank you!"
 )
 DANIEL_REMINDER = (
-    "Hi Daniel, next week's group meeting on {meeting_date} does not have "
+    "Hi <@{daniel_id}>, next week's group meeting on {meeting_date} does not have "
     "anyone in the cookie column yet. Could you find someone to bring cookies?"
 )
+GROUP_MEETING_CHANNEL = "C01AMNHQ8EL"
 
 
 def academic_year_sheet_name(day: date) -> str:
@@ -190,21 +191,22 @@ def build_plan(run_date: date, csv_text: str | None = None) -> dict[str, Any]:
 
     if people:
         for person in people:
-            channel = person["slack_id"] or "C01AMNHQ8EL"
-            mention = f"<@{person['slack_id']}> " if person["slack_id"] else f"{person['full_name']} "
-            text = COOKIE_REMINDER.format(first=person["first"].title(), meeting_date=meeting_date_text)
-            if channel == "C01AMNHQ8EL":
-                text = (
-                    f"Hi {mention.strip()}, this is a reminder that you are on cookie duty "
-                    f"for next week's group meeting on {meeting_date_text}. Thank you!"
-                )
-            messages.append({"channel": channel, "text": text, "reason": "cookie_duty"})
+            mention = f"<@{person['slack_id']}>" if person["slack_id"] else person["full_name"]
+            messages.append(
+                {
+                    "channel": GROUP_MEETING_CHANNEL,
+                    "text": COOKIE_REMINDER.format(mention=mention, meeting_date=meeting_date_text),
+                    "reason": "cookie_duty",
+                }
+            )
     else:
         status = "unassigned"
         messages.append(
             {
-                "channel": daniel["slack_id"],
-                "text": DANIEL_REMINDER.format(meeting_date=meeting_date_text),
+                "channel": GROUP_MEETING_CHANNEL,
+                "text": DANIEL_REMINDER.format(
+                    daniel_id=daniel["slack_id"], meeting_date=meeting_date_text
+                ),
                 "reason": "empty_cookie_cell",
             }
         )

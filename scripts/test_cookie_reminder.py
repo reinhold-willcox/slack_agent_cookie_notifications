@@ -40,19 +40,23 @@ class CookieReminderTests(unittest.TestCase):
         self.assertEqual(plan["status"], "assigned")
         self.assertEqual(plan["cookie_raw"], "Reinhold")
         self.assertEqual(plan["people"][0]["slack_id"], "U05Q1ED5NAU")
-        self.assertEqual(plan["messages"][0]["channel"], "U05Q1ED5NAU")
+        self.assertEqual(plan["messages"][0]["channel"], "C01AMNHQ8EL")
+        self.assertIn("U05Q1ED5NAU", plan["messages"][0]["text"])
 
     def test_assigned_ema_today_week(self) -> None:
         plan = build_plan(date(2026, 9, 11), csv_text=self.csv_text)
         self.assertEqual(plan["cookie_raw"], "Ema")
         self.assertEqual(plan["people"][0]["full_name"], "Ema Šipková")
+        self.assertEqual(plan["people"][0]["slack_id"], "U09J3E53BHN")
         self.assertEqual(plan["messages"][0]["channel"], "C01AMNHQ8EL")
+        self.assertIn("U09J3E53BHN", plan["messages"][0]["text"])
 
     def test_empty_cell_messages_daniel(self) -> None:
         plan = build_plan(date(2026, 10, 2), csv_text=self.csv_text)
         self.assertEqual(plan["status"], "unassigned")
         self.assertEqual(plan["meeting_date"], "2026-10-06")
-        self.assertEqual(plan["messages"][0]["channel"], "U07PZ8YUCA3")
+        self.assertEqual(plan["messages"][0]["channel"], "C01AMNHQ8EL")
+        self.assertIn("U07PZ8YUCA3", plan["messages"][0]["text"])
         self.assertIn("cookie column", plan["messages"][0]["text"])
 
     def test_prefers_tuesday_when_week_has_extra_meeting(self) -> None:

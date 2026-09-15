@@ -11,7 +11,7 @@ Do not use the Speaker column; that is often blank and is not cookie duty.
 1. Fetch the spreadsheet (in case names were swapped).
 2. Look at the **next calendar week** (the week after the Friday run).
 3. Use the Tuesday group meeting if that week has more than one row.
-4. Direct-message the person in 🎂, or Daniel Pauli if that cell is empty.
+4. Post in `#group-meeting` tagging the person in 🎂, or Daniel Pauli if that cell is empty. Direct messages only work if the requesting user is also in that DM, so mentions in the channel are the reliable path.
 
 ```bash
 python3 scripts/cookie_reminder.py --as-of 2026-09-18 --json
