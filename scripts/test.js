@@ -1,32 +1,29 @@
 /**
  * SPAM group-meeting cookie reminder.
  *
- * Friday job: look up next Tuesday's 🎂 cell, match that first name to a Slack
- * user, and ping them in #group-meeting. If the cell is empty, ping Daniel.
+ * Friday job: look up next Tuesday's 🎂 cell and report the first name(s)
+ * from that cell in #group-meeting. Slack should resolve those names to
+ * users. This script does not call users.list or mention Slack user ids.
  *
- * This is a cleaned rewrite of a colleague's Google Apps Script. The original
- * posted "No group meeting this week" when it saw that phrase in the sheet;
- * our roster does not use that text, so that path is gone. Cookie people are
- * matched by first name only (unique in this workspace), so the map does not
- * need a full-name update every time someone joins or leaves.
+ * If the cell is empty, it reports no first name (no Daniel fallback here).
  *
  * Setup
  * 1. In the organisation spreadsheet: Extensions > Apps Script, replace the
  *    stub with this file.
  * 2. Project Settings > Script properties:
- *      SLACK_BOT_TOKEN = xoxb-...   (chat:write and users:read; bot in #group-meeting)
- * 3. Triggers > Add trigger:
+ *      SLACK_BOT_TOKEN = xoxb-...   (chat:write; bot must be in #group-meeting)
+ * 3. In #group-meeting, run /invite @YourBot  (not_in_channel means this is missing)
+ * 4. Triggers > Add trigger:
  *      Function: sendCookieReminder
  *      Event: Time-driven, Week timer, Friday, 8am-9am
  *      Timezone: Europe/Brussels
- * 4. Use the spreadsheet menu Cookie reminder > Preview next ping to dry-run.
+ * 5. Use Cookie reminder > Preview next ping to see the first name without posting.
  */
 
 var COOKIE_HEADER = '🎂';
 var DATE_HEADER = 'Date';
 var CHANNEL_ID = 'C01AMNHQ8EL';
 var SHEET_ID = '1FOjEjX98ChrvnJA_f4oI8cce1NjN0sk_yNIQqwY74eo';
-var DANIEL_SLACK_ID = 'U07PZ8YUCA3';
 var DATE_RE = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/;
 var NAME_RE = /[A-Za-zÀ-ž]+/;
 var SKIP_TOKENS = {
@@ -71,22 +68,18 @@ function buildCookiePlan_(runDate, optContext) {
   var rows = context.rows || loadSheetRows_(sheetName);
   var meeting = findMeetingRow_(rows, meetingDate);
   var cookieRaw = meeting ? String(meeting.cookie || '').trim() : '';
-  var people = resolveCookiePeople_(cookieRaw, context.humans);
-  var assigned = people.length > 0;
-  var reason = meeting ? 'empty_cookie_cell' : 'no_meeting_row';
-  var message = assigned
-    ? cookieDutyMessage_(people, meetingDate)
-    : danielFallbackMessage_(meetingDate, cookieRaw, reason);
+  var firstNames = looksLikePerson_(cookieRaw) ? extractFirstNames_(cookieRaw) : [];
+  var status = !meeting ? 'no_meeting_row' : (firstNames.length ? 'assigned' : 'empty_cookie_cell');
 
   return {
     runDate: formatIsoDate_(runDate),
     sheetName: sheetName,
     meetingDate: formatIsoDate_(meetingDate),
     cookieRaw: cookieRaw,
-    status: assigned ? 'assigned' : reason,
-    people: people,
+    firstNames: firstNames,
+    status: status,
     channel: CHANNEL_ID,
-    text: message
+    text: cookieDutyMessage_(firstNames, meetingDate, status)
   };
 }
 
@@ -164,7 +157,7 @@ function extractFirstNames_(raw) {
   for (var i = 0; i < parts.length; i++) {
     var match = parts[i].match(NAME_RE);
     if (match) {
-      names.push(match[0].toLowerCase());
+      names.push(match[0]);
     }
   }
   return names;
@@ -207,32 +200,24 @@ function findMeetingRow_(rows, meetingDate) {
   return matches.length ? matches[0] : null;
 }
 
-function mentionFor_(person) {
-  return person.slackId ? '<@' + person.slackId + '>' : person.fullName;
-}
-
-function cookieDutyMessage_(people, meetingDate) {
-  var mentions = people.map(mentionFor_).join(' and ');
-  return 'Hi ' + mentions + ", this is a reminder that you are on cookie duty for next week's group meeting on " +
-    formatMeetingDay_(meetingDate) + '. Thank you!';
-}
-
-function danielFallbackMessage_(meetingDate, cookieRaw, reason) {
-  var mention = '<@' + DANIEL_SLACK_ID + '>';
-  if (reason === 'no_meeting_row') {
-    return 'Hi ' + mention + ', there is no group-meeting row for ' + formatMeetingDay_(meetingDate) +
-      ' in the 🎂 column. Could you add a date or find someone to bring cookies?';
+function cookieDutyMessage_(firstNames, meetingDate, status) {
+  var when = formatMeetingDay_(meetingDate);
+  if (status === 'no_meeting_row') {
+    return 'Cookie duty first name: (none)\nMeeting: ' + when + '\nNo group-meeting row for that date.';
   }
-  if (looksLikePerson_(cookieRaw)) {
-    return 'Hi ' + mention + ", next week's group meeting on " + formatMeetingDay_(meetingDate) +
-      ' lists "' + cookieRaw + '" for cookies, but that first name is not a unique Slack user. Could you assign someone?';
+  if (!firstNames.length) {
+    return 'Cookie duty first name: (none)\nMeeting: ' + when + '\nThe 🎂 cell is empty.';
   }
-  return 'Hi ' + mention + ", next week's group meeting on " + formatMeetingDay_(meetingDate) +
-    ' does not have anyone in the cookie column yet. Could you find someone to bring cookies?';
+  return 'Cookie duty first name: ' + firstNames.join(', ') + '\nMeeting: ' + when;
 }
 
 function previewText_(plan) {
-  return plan.status + ' for ' + plan.meetingDate + ' (' + (plan.cookieRaw || 'empty') + ')\n\n' + plan.text;
+  var names = plan.firstNames && plan.firstNames.length ? plan.firstNames.join(', ') : '(none)';
+  return 'First name from 🎂: ' + names + '\n' +
+    'Meeting: ' + plan.meetingDate + '\n' +
+    'Status: ' + plan.status + '\n' +
+    'Sheet cell: ' + (plan.cookieRaw || 'empty') + '\n\n' +
+    plan.text;
 }
 
 function loadSheetRows_(sheetName) {
@@ -266,7 +251,7 @@ function loadSheetRows_(sheetName) {
 function slackToken_() {
   var token = PropertiesService.getScriptProperties().getProperty('SLACK_BOT_TOKEN');
   if (!token) {
-    throw new Error('Set script property SLACK_BOT_TOKEN to a Slack bot token with chat:write and users:read.');
+    throw new Error('Set script property SLACK_BOT_TOKEN to a Slack bot token with chat:write.');
   }
   return token;
 }
@@ -290,93 +275,8 @@ function slackFetch_(method, payload) {
   return data;
 }
 
-function listSlackHumans_() {
-  var members = [];
-  var cursor = '';
-  do {
-    var url = 'https://slack.com/api/users.list?limit=200';
-    if (cursor) {
-      url += '&cursor=' + encodeURIComponent(cursor);
-    }
-    var options = {
-      method: 'get',
-      headers: { Authorization: 'Bearer ' + slackToken_() },
-      muteHttpExceptions: true
-    };
-    var response = UrlFetchApp.fetch(url, options);
-    var data = JSON.parse(response.getContentText());
-    if (!data.ok) {
-      throw new Error('Slack users.list failed: ' + (data.error || response.getContentText()));
-    }
-    members = members.concat(data.members || []);
-    cursor = data.response_metadata && data.response_metadata.next_cursor;
-  } while (cursor);
-  var humans = [];
-  for (var i = 0; i < members.length; i++) {
-    var member = members[i];
-    if (!member || member.deleted || member.is_bot || member.id === 'USLACKBOT') {
-      continue;
-    }
-    humans.push({
-      id: member.id,
-      fullName: (member.profile && (member.profile.real_name || member.profile.display_name)) || member.name || member.id,
-      firstNames: slackFirstNames_(member)
-    });
-  }
-  return humans;
-}
-
-function slackFirstNames_(member) {
-  var profile = member.profile || {};
-  var fields = [profile.display_name, profile.real_name, profile.first_name, member.real_name, member.name];
-  var names = {};
-  for (var i = 0; i < fields.length; i++) {
-    var extracted = extractFirstNames_(fields[i] || '');
-    for (var j = 0; j < extracted.length; j++) {
-      names[extracted[j]] = true;
-    }
-  }
-  return Object.keys(names);
-}
-
-function matchFirstName_(first, humans) {
-  var matches = [];
-  for (var i = 0; i < humans.length; i++) {
-    if (humans[i].firstNames.indexOf(first) !== -1) {
-      matches.push(humans[i]);
-    }
-  }
-  if (matches.length === 1) {
-    return {
-      first: first,
-      fullName: matches[0].fullName,
-      slackId: matches[0].id
-    };
-  }
-  return null;
-}
-
-function resolveCookiePeople_(raw, optHumans) {
-  if (!looksLikePerson_(raw)) {
-    return [];
-  }
-  var firsts = extractFirstNames_(raw);
-  if (!firsts.length) {
-    return [];
-  }
-  var humans = optHumans || listSlackHumans_();
-  var people = [];
-  for (var i = 0; i < firsts.length; i++) {
-    var match = matchFirstName_(firsts[i], humans);
-    if (!match) {
-      return [];
-    }
-    people.push(match);
-  }
-  return people;
-}
-
 function postCookiePlan_(plan, dryRun) {
+  log_('First name from 🎂: ' + (plan.firstNames.length ? plan.firstNames.join(', ') : '(none)'));
   log_(plan.text);
   if (dryRun) {
     return plan;
@@ -402,7 +302,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     COOKIE_HEADER: COOKIE_HEADER,
     CHANNEL_ID: CHANNEL_ID,
-    DANIEL_SLACK_ID: DANIEL_SLACK_ID,
     academicYearSheetName_: academicYearSheetName_,
     nextTuesday_: nextTuesday_,
     parseSheetDate_: parseSheetDate_,
@@ -410,11 +309,8 @@ if (typeof module !== 'undefined') {
     extractFirstNames_: extractFirstNames_,
     findHeader_: findHeader_,
     findMeetingRow_: findMeetingRow_,
-    matchFirstName_: matchFirstName_,
     cookieDutyMessage_: cookieDutyMessage_,
-    danielFallbackMessage_: danielFallbackMessage_,
     formatMeetingDay_: formatMeetingDay_,
-    buildCookiePlan_: buildCookiePlan_,
-    resolveCookiePeople_: resolveCookiePeople_
+    buildCookiePlan_: buildCookiePlan_
   };
 }
